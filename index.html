@@ -1,0 +1,496 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cotação de Voo — BLACK Aviação</title>
+
+  <!-- 👇👇 ADICIONE ESTAS 5 LINHAS AQUI 👇👇 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js");
+    }
+  </script>
+  <!-- 👆👆 ADICIONE ESTAS 5 LINHAS AQUI 👆👆 -->
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      background: #0f172a;
+    }
+  </style>
+</head>
+
+
+<body class="min-h-screen flex items-center justify-center px-4">
+
+  <!-- CARTÃO PRINCIPAL -->
+  <main class="w-full max-w-xl bg-slate-900/90 text-slate-100 rounded-2xl shadow-xl p-6 space-y-6">
+    
+    <!-- CABEÇALHO -->
+    <header class="space-y-1">
+      <h1 class="text-xl font-semibold">Cotação de Voo</h1>
+      <p class="text-sm text-slate-400">
+        BLACK Aviação — Simulador de rota e valor.
+      </p>
+    </header>
+
+    <!-- TRECHOS -->
+    <section class="space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-medium text-slate-200">Trechos da missão</h2>
+      </div>
+
+      <div id="trechos" class="space-y-2">
+        <!-- Trechos serão inseridos via JS -->
+      </div>
+
+      <div class="flex items-center justify-between gap-2 text-xs text-slate-300 mt-2">
+        <button id="btnAddTrecho"
+          type="button"
+          class="px-3 py-1 rounded-full border border-slate-600 hover:bg-slate-800">
+          + Adicionar trecho
+        </button>
+        <button id="btnIdaVolta"
+          type="button"
+          class="px-3 py-1 rounded-full border border-sky-500 text-sky-300 hover:bg-sky-900/40">
+          Ida e volta do último trecho
+        </button>
+      </div>
+    </section>
+
+    <!-- DADOS GERAIS (DATA / PAX) -->
+    <section class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium mb-1">Data do voo (opcional)</label>
+        <input id="dataVoo" type="date"
+          class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-sky-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Nº de passageiros (opcional)</label>
+        <input id="pax" type="number" min="1"
+          class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-sky-500"
+          placeholder="Ex: 4" />
+      </div>
+    </section>
+
+    <!-- PREÇO -->
+    <section class="space-y-2">
+      <h2 class="text-sm font-medium text-slate-200">Preço</h2>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm mb-1">R$/KM</label>
+          <input id="precoKm" type="text"
+            class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-sky-500"
+            placeholder="Ex: 80,00" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Valor total (R$)</label>
+          <input id="valorTotal" type="text"
+            class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-sky-500"
+            placeholder="Ex: 50.000,00" />
+        </div>
+      </div>
+      <p class="text-[11px] text-slate-500">
+        Preencha <strong>R$/KM</strong> <em>ou</em> <strong>Valor total</strong>. 
+        Se informar os dois, o sistema prioriza o <strong>R$/KM</strong>.
+      </p>
+    </section>
+
+    <!-- BOTÃO E RESULTADO -->
+    <section class="space-y-3">
+      <button id="btnCalcular"
+        class="w-full rounded-full bg-sky-500 hover:bg-sky-400 text-slate-900 text-sm font-semibold py-2.5 transition">
+        Calcular cotação
+      </button>
+
+      <div id="resultado"
+        class="text-sm text-slate-300 bg-slate-800/80 rounded-xl p-3 min-h-[60px]">
+        Monte os trechos, defina o preço e clique em <strong>Calcular cotação</strong>.
+      </div>
+    </section>
+
+    <!-- RODAPÉ -->
+    <footer class="text-[11px] text-slate-500 text-center">
+      Versão multi-trechos — baseada em histórico real de voos.
+    </footer>
+
+  </main>
+
+<script>
+let AIRPORTS = {};
+let BASE_REAL = [];
+let VELOCIDADE_MEDIA_GLOBAL = null; // km/h
+
+/* ============================================================
+   UTILITÁRIOS
+   ============================================================ */
+function toRad(deg) { return deg * Math.PI / 180; }
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat/2)**2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon/2)**2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatarTempoHorasDec(tempoHorasDec) {
+  if (tempoHorasDec == null || isNaN(tempoHorasDec)) return null;
+  const totalMin = Math.round(tempoHorasDec * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${String(h).padStart(2,"0")}h${String(m).padStart(2,"0")}min`;
+}
+
+function getAirport(icao) {
+  if (!icao) return null;
+  return AIRPORTS[icao.trim().toUpperCase()] || null;
+}
+
+function parseNumeroBr(v) {
+  if (!v) return NaN;
+  return parseFloat(String(v).replace(/\./g, "").replace(",", "."));
+}
+
+function formatarMoedaBr(v) {
+  if (v == null || isNaN(v)) return "-";
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatarRsPorKm(v) {
+  if (v == null || isNaN(v)) return "-";
+  return "R$ " + v.toFixed(2).replace(".", ",");
+}
+
+/* ============================================================
+   TRECHOS (UI DINÂMICA)
+   ============================================================ */
+function renumerarTrechos() {
+  const rows = document.querySelectorAll(".trecho-row");
+  rows.forEach((row, idx) => {
+    const label = row.querySelector(".trecho-label");
+    if (label) label.textContent = `Trecho ${idx + 1}`;
+    const btnDel = row.querySelector(".btn-remover-trecho");
+    if (btnDel) {
+      if (rows.length === 1 && idx === 0) {
+        btnDel.disabled = true;
+        btnDel.classList.add("opacity-30", "cursor-not-allowed");
+      } else {
+        btnDel.disabled = false;
+        btnDel.classList.remove("opacity-30", "cursor-not-allowed");
+      }
+    }
+  });
+}
+
+function criarTrechoRow(origem = "", destino = "") {
+  const container = document.getElementById("trechos");
+  const row = document.createElement("div");
+  row.className = "trecho-row flex items-center gap-2";
+
+  row.innerHTML = `
+    <span class="trecho-label text-xs text-slate-500 w-16">Trecho ?</span>
+    <input type="text" maxlength="4"
+      class="trecho-origem w-20 rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-xs uppercase focus:ring-2 focus:ring-sky-500"
+      placeholder="ICAO"
+      value="${origem}">
+    <span class="text-slate-500 text-xs">→</span>
+    <input type="text" maxlength="4"
+      class="trecho-destino w-20 rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-xs uppercase focus:ring-2 focus:ring-sky-500"
+      placeholder="ICAO"
+      value="${destino}">
+    <button type="button"
+      class="btn-remover-trecho text-[10px] px-2 py-1 rounded-full border border-slate-600 text-slate-300 hover:bg-slate-800">
+      X
+    </button>
+  `;
+
+  const btnDel = row.querySelector(".btn-remover-trecho");
+  btnDel.addEventListener("click", () => {
+    const rows = document.querySelectorAll(".trecho-row");
+    if (rows.length > 1) {
+      row.remove();
+      renumerarTrechos();
+    }
+  });
+
+  container.appendChild(row);
+  renumerarTrechos();
+}
+
+/* ============================================================
+   CARREGAR A BASE DE AEROPORTOS
+   ============================================================ */
+fetch("airports-br.json")
+  .then(r => r.json())
+  .then(data => {
+    data.forEach(ap => {
+      if (ap.icao) {
+        AIRPORTS[ap.icao.toUpperCase()] = {
+          icao: ap.icao.toUpperCase(),
+          nome: ap.name || ap.nome || "",
+          lat: parseFloat(ap.lat),
+          lon: parseFloat(ap.lon)
+        };
+      }
+    });
+    console.log("Aeroportos indexados:", Object.keys(AIRPORTS).length);
+    carregarBaseReal();
+  })
+  .catch(err => console.error("Erro ao carregar airports-br.json:", err));
+
+/* ============================================================
+   CARREGAR BASE REAL (basereal.csv)
+   ============================================================ */
+function carregarBaseReal() {
+  fetch("basereal.csv")
+    .then(r => r.text())
+    .then(text => {
+      const linhas = text.trim().split("\n");
+      if (!linhas.length) return;
+
+      const headerLine = linhas.shift();
+      const sep = headerLine.includes(";") ? ";" : ",";
+      const headers = headerLine.split(sep).map(h => h.trim().toLowerCase().replace("\ufeff",""));
+
+      const idxOrigem  = headers.indexOf("origem");
+      const idxDestino = headers.indexOf("destino");
+      const idxDistKm  = headers.indexOf("dist_km");
+      const idxTempo   = headers.indexOf("tempo");
+
+      BASE_REAL = linhas.map(linha => {
+        const cols = linha.split(sep);
+        return {
+          origem:  (cols[idxOrigem]  || "").trim().toUpperCase(),
+          destino: (cols[idxDestino] || "").trim().toUpperCase(),
+          dist_km: parseNumeroBr(cols[idxDistKm]),
+          tempo:   parseNumeroBr(cols[idxTempo])
+        };
+      }).filter(r =>
+        r.origem && r.destino &&
+        !isNaN(r.dist_km) &&
+        !isNaN(r.tempo) &&
+        r.dist_km > 0 &&
+        r.tempo > 0
+      );
+
+      console.log("Rotas REAIS carregadas:", BASE_REAL.length);
+
+      // calcula velocidade média global (km/h)
+      if (BASE_REAL.length > 0) {
+        const somaDistGlobal  = BASE_REAL.reduce((s, r) => s + r.dist_km, 0);
+        const somaTempoGlobal = BASE_REAL.reduce((s, r) => s + r.tempo, 0);
+        if (somaDistGlobal > 0 && somaTempoGlobal > 0) {
+          VELOCIDADE_MEDIA_GLOBAL = somaDistGlobal / somaTempoGlobal;
+          console.log("Velocidade média global:", VELOCIDADE_MEDIA_GLOBAL, "km/h");
+        }
+      }
+    })
+    .catch(err => console.error("Erro ao carregar basereal.csv:", err));
+}
+
+/* ============================================================
+   BOTÕES: ADICIONAR TRECHO / IDA E VOLTA
+   ============================================================ */
+document.addEventListener("DOMContentLoaded", () => {
+  // Começa com um trecho vazio
+  criarTrechoRow();
+
+  document.getElementById("btnAddTrecho").addEventListener("click", () => {
+    criarTrechoRow();
+  });
+
+  document.getElementById("btnIdaVolta").addEventListener("click", () => {
+    const rows = document.querySelectorAll(".trecho-row");
+    if (!rows.length) {
+      criarTrechoRow();
+      return;
+    }
+    const lastRow = rows[rows.length - 1];
+    const origem  = lastRow.querySelector(".trecho-origem").value.toUpperCase();
+    const destino = lastRow.querySelector(".trecho-destino").value.toUpperCase();
+
+    const res = document.getElementById("resultado");
+    if (!origem || !destino) {
+      res.innerHTML = "Para gerar ida e volta, preencha <strong>origem</strong> e <strong>destino</strong> do último trecho.";
+      return;
+    }
+
+    criarTrechoRow(destino, origem);
+  });
+});
+
+/* ============================================================
+   BOTÃO CALCULAR
+   ============================================================ */
+document.getElementById("btnCalcular").addEventListener("click", () => {
+  const res = document.getElementById("resultado");
+  const data = document.getElementById("dataVoo").value;
+  const pax  = document.getElementById("pax").value;
+  const precoKmInput    = parseNumeroBr(document.getElementById("precoKm").value);
+  const valorTotalInput = parseNumeroBr(document.getElementById("valorTotal").value);
+
+  const rows = document.querySelectorAll(".trecho-row");
+  if (!rows.length) {
+    res.innerHTML = "Adicione pelo menos <strong>um trecho</strong>.";
+    return;
+  }
+
+  const trechos = [];
+  for (const row of rows) {
+    const origem  = row.querySelector(".trecho-origem").value.toUpperCase();
+    const destino = row.querySelector(".trecho-destino").value.toUpperCase();
+    if (!origem || !destino) {
+      res.innerHTML = "Todos os trechos devem ter <strong>origem</strong> e <strong>destino</strong>.";
+      return;
+    }
+    trechos.push({ origem, destino });
+  }
+
+  const resultados = [];
+  let totalKm = 0;
+  let totalTempoHoras = 0;
+
+  for (const t of trechos) {
+    const apOrigem  = getAirport(t.origem);
+    const apDestino = getAirport(t.destino);
+
+    if (!apOrigem || !apDestino) {
+      res.innerHTML = `Não encontrei o aeródromo <strong>${t.origem}</strong> ou <strong>${t.destino}</strong> na base.`;
+      return;
+    }
+
+    const kmTeorico = Math.round(
+      haversineKm(apOrigem.lat, apOrigem.lon, apDestino.lat, apDestino.lon)
+    );
+
+    // Rotas reais para essa origem/destino
+    const rotas = BASE_REAL.filter(r => r.origem === t.origem && r.destino === t.destino);
+
+    let kmFinal = kmTeorico;
+    let tempoHoras = null;
+    let flagReal = false;
+
+    // 1) Se há rotas reais, usa média real daquela rota
+    if (rotas.length > 0) {
+      const somaDist = rotas.reduce((s, r) => s + r.dist_km, 0);
+      const somaTempo = rotas.reduce((s, r) => s + r.tempo, 0);
+
+      if (somaDist > 0 && somaTempo > 0) {
+        kmFinal = Math.round(somaDist / rotas.length);
+        const velocidadeMedia = somaDist / somaTempo; // km/h
+        tempoHoras = kmFinal / velocidadeMedia;
+        flagReal = true;
+      }
+    }
+
+    // 2) Se não há histórico daquela rota, usa velocidade média GLOBAL
+    if (!flagReal && VELOCIDADE_MEDIA_GLOBAL && VELOCIDADE_MEDIA_GLOBAL > 0) {
+      tempoHoras = kmFinal / VELOCIDADE_MEDIA_GLOBAL;
+    }
+
+    totalKm += kmFinal;
+    if (tempoHoras != null && !isNaN(tempoHoras)) {
+      totalTempoHoras += tempoHoras;
+    }
+
+    resultados.push({
+      origem: t.origem,
+      destino: t.destino,
+      apOrigem,
+      apDestino,
+      kmTeorico,
+      kmFinal,
+      tempoHoras,
+      flagReal
+    });
+  }
+
+  // PREÇO
+  let precoPorKm = null;
+  let valorTotal = null;
+
+  if (!isNaN(precoKmInput) && precoKmInput > 0) {
+    // Prioridade para R$/KM
+    precoPorKm = precoKmInput;
+    valorTotal = totalKm * precoPorKm;
+  } else if (!isNaN(valorTotalInput) && valorTotalInput > 0) {
+    valorTotal = valorTotalInput;
+    if (totalKm > 0) {
+      precoPorKm = valorTotal / totalKm;
+    }
+  }
+
+  // HTML de cada trecho
+  let htmlTrechos = "";
+  resultados.forEach((r, idx) => {
+    const status = r.flagReal
+      ? `<span class="text-emerald-400 font-semibold">REAL</span>`
+      : `<span class="text-amber-300 font-semibold">TEÓRICA</span>`;
+
+    const tempoFmt = r.tempoHoras != null
+      ? formatarTempoHorasDec(r.tempoHoras)
+      : null;
+
+    htmlTrechos += `
+      <div class="mb-2 border-b border-slate-700 pb-2">
+        <div class="text-xs text-slate-500 mb-1">Trecho ${idx + 1}</div>
+        <div>
+          <strong>${r.apOrigem.icao}</strong> (${r.apOrigem.nome}) →
+          <strong>${r.apDestino.icao}</strong> (${r.apDestino.nome})
+        </div>
+        <div>Status: ${status}</div>
+        <div>Distância utilizada: <strong>${r.kmFinal.toLocaleString("pt-BR")} km</strong></div>
+        ${tempoFmt ? `<div>Tempo estimado: <strong>${tempoFmt}</strong></div>` : ""}
+      </div>
+    `;
+  });
+
+  const tempoTotalFmt = totalTempoHoras > 0
+    ? formatarTempoHorasDec(totalTempoHoras)
+    : null;
+
+  let htmlTotais = `
+    <div class="mt-2">
+      <div>Distância total da missão: <strong>${totalKm.toLocaleString("pt-BR")} km</strong></div>
+      ${tempoTotalFmt ? `<div>Tempo total estimado: <strong>${tempoTotalFmt}</strong></div>` : ""}
+    </div>
+  `;
+
+  let htmlPreco = "";
+  if (precoPorKm != null || valorTotal != null) {
+    htmlPreco = `
+      <div class="mt-3 border-t border-slate-700 pt-2">
+        <div class="text-sm font-medium text-slate-200 mb-1">Resumo financeiro</div>
+        ${precoPorKm != null ? `<div>R$/KM efetivo: <strong>${formatarRsPorKm(precoPorKm)}</strong></div>` : ""}
+        ${valorTotal != null ? `<div>Valor total: <strong>${formatarMoedaBr(valorTotal)}</strong></div>` : ""}
+      </div>
+    `;
+  }
+
+  const mostrarData = data ? `<div>Data do voo: <strong>${data}</strong></div>` : "";
+  const mostrarPax  = pax  ? `<div>Passageiros: <strong>${pax}</strong></div>` : "";
+
+  res.innerHTML = `
+    ${htmlTrechos}
+    ${htmlTotais}
+    ${htmlPreco}
+    <div class="mt-3 text-xs text-slate-500">
+      ${mostrarData}
+      ${mostrarPax}
+    </div>
+  `;
+});
+</script>
+
+</body>
+</html>
