@@ -5,17 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Cotação de Voo — BLACK Aviação</title>
 
-  <!-- 👇👇 ADICIONE ESTAS 5 LINHAS AQUI 👇👇 -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f172a">
-
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("service-worker.js");
-    }
-  </script>
-  <!-- 👆👆 ADICIONE ESTAS 5 LINHAS AQUI 👆👆 -->
-
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -25,7 +14,6 @@
     }
   </style>
 </head>
-
 
 <body class="min-h-screen flex items-center justify-center px-4">
 
@@ -61,21 +49,6 @@
           class="px-3 py-1 rounded-full border border-sky-500 text-sky-300 hover:bg-sky-900/40">
           Ida e volta do último trecho
         </button>
-      </div>
-    </section>
-
-    <!-- DADOS GERAIS (DATA / PAX) -->
-    <section class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="block text-sm font-medium mb-1">Data do voo (opcional)</label>
-        <input id="dataVoo" type="date"
-          class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-sky-500" />
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">Nº de passageiros (opcional)</label>
-        <input id="pax" type="number" min="1"
-          class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:ring-2 focus:ring-sky-500"
-          placeholder="Ex: 4" />
       </div>
     </section>
 
@@ -125,7 +98,6 @@
 <script>
 let AIRPORTS = {};
 let BASE_REAL = [];
-let VELOCIDADE_MEDIA_GLOBAL = null; // km/h
 
 /* ============================================================
    UTILITÁRIOS
@@ -284,16 +256,6 @@ function carregarBaseReal() {
       );
 
       console.log("Rotas REAIS carregadas:", BASE_REAL.length);
-
-      // calcula velocidade média global (km/h)
-      if (BASE_REAL.length > 0) {
-        const somaDistGlobal  = BASE_REAL.reduce((s, r) => s + r.dist_km, 0);
-        const somaTempoGlobal = BASE_REAL.reduce((s, r) => s + r.tempo, 0);
-        if (somaDistGlobal > 0 && somaTempoGlobal > 0) {
-          VELOCIDADE_MEDIA_GLOBAL = somaDistGlobal / somaTempoGlobal;
-          console.log("Velocidade média global:", VELOCIDADE_MEDIA_GLOBAL, "km/h");
-        }
-      }
     })
     .catch(err => console.error("Erro ao carregar basereal.csv:", err));
 }
@@ -334,8 +296,6 @@ document.addEventListener("DOMContentLoaded", () => {
    ============================================================ */
 document.getElementById("btnCalcular").addEventListener("click", () => {
   const res = document.getElementById("resultado");
-  const data = document.getElementById("dataVoo").value;
-  const pax  = document.getElementById("pax").value;
   const precoKmInput    = parseNumeroBr(document.getElementById("precoKm").value);
   const valorTotalInput = parseNumeroBr(document.getElementById("valorTotal").value);
 
@@ -380,10 +340,10 @@ document.getElementById("btnCalcular").addEventListener("click", () => {
     let tempoHoras = null;
     let flagReal = false;
 
-    // 1) Se há rotas reais, usa média real daquela rota
+    // 1) SE HÁ ROTAS REAIS → usar média real
     if (rotas.length > 0) {
-      const somaDist = rotas.reduce((s, r) => s + r.dist_km, 0);
-      const somaTempo = rotas.reduce((s, r) => s + r.tempo, 0);
+      const somaDist  = rotas.reduce((s, r) => s + r.dist_km, 0);
+      const somaTempo = rotas.reduce((s, r) => s + r.tempo,   0);
 
       if (somaDist > 0 && somaTempo > 0) {
         kmFinal = Math.round(somaDist / rotas.length);
@@ -393,9 +353,15 @@ document.getElementById("btnCalcular").addEventListener("click", () => {
       }
     }
 
-    // 2) Se não há histórico daquela rota, usa velocidade média GLOBAL
-    if (!flagReal && VELOCIDADE_MEDIA_GLOBAL && VELOCIDADE_MEDIA_GLOBAL > 0) {
-      tempoHoras = kmFinal / VELOCIDADE_MEDIA_GLOBAL;
+    // 2) SE NÃO HÁ ROTAS REAIS → usar velocidade média GLOBAL
+    if (!flagReal && BASE_REAL.length > 0) {
+      const somaDistGlobal  = BASE_REAL.reduce((s, r) => s + r.dist_km, 0);
+      const somaTempoGlobal = BASE_REAL.reduce((s, r) => s + r.tempo,   0);
+
+      if (somaDistGlobal > 0 && somaTempoGlobal > 0) {
+        const velocidadeMediaGlobal = somaDistGlobal / somaTempoGlobal; // km/h
+        tempoHoras = kmFinal / velocidadeMediaGlobal;
+      }
     }
 
     totalKm += kmFinal;
@@ -430,7 +396,7 @@ document.getElementById("btnCalcular").addEventListener("click", () => {
     }
   }
 
-  // HTML de cada trecho
+  // Montar HTML dos trechos
   let htmlTrechos = "";
   resultados.forEach((r, idx) => {
     const status = r.flagReal
@@ -477,17 +443,10 @@ document.getElementById("btnCalcular").addEventListener("click", () => {
     `;
   }
 
-  const mostrarData = data ? `<div>Data do voo: <strong>${data}</strong></div>` : "";
-  const mostrarPax  = pax  ? `<div>Passageiros: <strong>${pax}</strong></div>` : "";
-
   res.innerHTML = `
     ${htmlTrechos}
     ${htmlTotais}
     ${htmlPreco}
-    <div class="mt-3 text-xs text-slate-500">
-      ${mostrarData}
-      ${mostrarPax}
-    </div>
   `;
 });
 </script>
