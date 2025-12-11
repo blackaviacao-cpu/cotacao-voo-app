@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Cotação de Voo — BLACK Aviação</title>
 
+  <!-- 👇👇 ADICIONE ESTAS 5 LINHAS AQUI 👇👇 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js");
+    }
+  </script>
+  <!-- 👆👆 ADICIONE ESTAS 5 LINHAS AQUI 👆👆 -->
+
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -14,6 +25,7 @@
     }
   </style>
 </head>
+
 
 <body class="min-h-screen flex items-center justify-center px-4">
 
@@ -98,6 +110,7 @@
 <script>
 let AIRPORTS = {};
 let BASE_REAL = [];
+let VELOCIDADE_MEDIA_GLOBAL = null; // km/h
 
 /* ============================================================
    UTILITÁRIOS
@@ -256,6 +269,16 @@ function carregarBaseReal() {
       );
 
       console.log("Rotas REAIS carregadas:", BASE_REAL.length);
+
+      // calcula velocidade média global (km/h)
+      if (BASE_REAL.length > 0) {
+        const somaDistGlobal  = BASE_REAL.reduce((s, r) => s + r.dist_km, 0);
+        const somaTempoGlobal = BASE_REAL.reduce((s, r) => s + r.tempo, 0);
+        if (somaDistGlobal > 0 && somaTempoGlobal > 0) {
+          VELOCIDADE_MEDIA_GLOBAL = somaDistGlobal / somaTempoGlobal;
+          console.log("Velocidade média global:", VELOCIDADE_MEDIA_GLOBAL, "km/h");
+        }
+      }
     })
     .catch(err => console.error("Erro ao carregar basereal.csv:", err));
 }
@@ -340,10 +363,10 @@ document.getElementById("btnCalcular").addEventListener("click", () => {
     let tempoHoras = null;
     let flagReal = false;
 
-    // 1) SE HÁ ROTAS REAIS → usar média real
+    // 1) Se há rotas reais, usa média real daquela rota
     if (rotas.length > 0) {
-      const somaDist  = rotas.reduce((s, r) => s + r.dist_km, 0);
-      const somaTempo = rotas.reduce((s, r) => s + r.tempo,   0);
+      const somaDist = rotas.reduce((s, r) => s + r.dist_km, 0);
+      const somaTempo = rotas.reduce((s, r) => s + r.tempo, 0);
 
       if (somaDist > 0 && somaTempo > 0) {
         kmFinal = Math.round(somaDist / rotas.length);
@@ -353,15 +376,9 @@ document.getElementById("btnCalcular").addEventListener("click", () => {
       }
     }
 
-    // 2) SE NÃO HÁ ROTAS REAIS → usar velocidade média GLOBAL
-    if (!flagReal && BASE_REAL.length > 0) {
-      const somaDistGlobal  = BASE_REAL.reduce((s, r) => s + r.dist_km, 0);
-      const somaTempoGlobal = BASE_REAL.reduce((s, r) => s + r.tempo,   0);
-
-      if (somaDistGlobal > 0 && somaTempoGlobal > 0) {
-        const velocidadeMediaGlobal = somaDistGlobal / somaTempoGlobal; // km/h
-        tempoHoras = kmFinal / velocidadeMediaGlobal;
-      }
+    // 2) Se não há histórico daquela rota, usa velocidade média GLOBAL
+    if (!flagReal && VELOCIDADE_MEDIA_GLOBAL && VELOCIDADE_MEDIA_GLOBAL > 0) {
+      tempoHoras = kmFinal / VELOCIDADE_MEDIA_GLOBAL;
     }
 
     totalKm += kmFinal;
@@ -396,7 +413,7 @@ document.getElementById("btnCalcular").addEventListener("click", () => {
     }
   }
 
-  // Montar HTML dos trechos
+  // HTML de cada trecho
   let htmlTrechos = "";
   resultados.forEach((r, idx) => {
     const status = r.flagReal
