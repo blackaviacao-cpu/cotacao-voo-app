@@ -376,10 +376,18 @@ document.getElementById("btnCalcular").addEventListener("click", () => {
       }
     }
 
-    // 2) Se não há histórico daquela rota, usa velocidade média GLOBAL
-    if (!flagReal && VELOCIDADE_MEDIA_GLOBAL && VELOCIDADE_MEDIA_GLOBAL > 0) {
-      tempoHoras = kmFinal / VELOCIDADE_MEDIA_GLOBAL;
-    }
+// 2) Se NÃO há rotas reais → aplicar fator 1.10 na distância + usar velocidade média global
+if (!flagReal) {
+
+  // aplica fator 10% na distância teórica
+  kmFinal = Math.round(kmTeorico * 1.10);
+
+  // se existir velocidade global, calcula o tempo corrigido
+  if (VELOCIDADE_MEDIA_GLOBAL && VELOCIDADE_MEDIA_GLOBAL > 0) {
+    tempoHoras = kmFinal / VELOCIDADE_MEDIA_GLOBAL;
+  }
+}
+
 
     totalKm += kmFinal;
     if (tempoHoras != null && !isNaN(tempoHoras)) {
