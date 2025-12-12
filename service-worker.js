@@ -7,14 +7,10 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
-  const req = event.request;
-
-  // ❗ NÃO intercepta navegação HTML
-  if (req.mode === "navigate") {
-    return;
-  }
+  // 🚫 NÃO intercepta navegação (HTML / redirects)
+  if (event.request.mode === "navigate") return;
 
   event.respondWith(
-    fetch(req).catch(() => caches.match(req))
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });
