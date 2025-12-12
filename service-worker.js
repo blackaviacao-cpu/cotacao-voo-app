@@ -1,19 +1,20 @@
-self.addEventListener("install", e => {
-  e.waitUntil(
-    caches.open("black-cotacao-v1").then(cache => {
-      return cache.addAll([
-        "./",
-        "./index.html",
-        "./manifest.json",
-        "./airports-br.json",
-        "./basereal.csv"
-      ]);
-    })
-  );
+self.addEventListener("install", () => {
+  self.skipWaiting();
 });
 
-self.addEventListener("fetch", e => {
-  e.respondWith(
-    caches.match(e.request).then(resp => resp || fetch(e.request))
+self.addEventListener("activate", event => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("fetch", event => {
+  const req = event.request;
+
+  // ❗ NÃO intercepta navegação HTML
+  if (req.mode === "navigate") {
+    return;
+  }
+
+  event.respondWith(
+    fetch(req).catch(() => caches.match(req))
   );
 });
