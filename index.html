@@ -290,29 +290,47 @@ document.addEventListener("DOMContentLoaded", () => {
   // Começa com um trecho vazio
   criarTrechoRow();
 
+  // ADICIONAR TRECHO
   document.getElementById("btnAddTrecho").addEventListener("click", () => {
-    criarTrechoRow();
+    const rows = document.querySelectorAll(".trecho-row");
+
+    // fallback de segurança
+    if (!rows.length) {
+      criarTrechoRow();
+      return;
+    }
+
+    const lastRow = rows[rows.length - 1];
+    const destinoAnterior =
+      lastRow.querySelector(".trecho-destino").value.toUpperCase();
+
+    // nova linha herda o destino anterior como origem
+    criarTrechoRow(destinoAnterior, "");
   });
 
+  // IDA E VOLTA DO ÚLTIMO TRECHO
   document.getElementById("btnIdaVolta").addEventListener("click", () => {
     const rows = document.querySelectorAll(".trecho-row");
     if (!rows.length) {
       criarTrechoRow();
       return;
     }
+
     const lastRow = rows[rows.length - 1];
     const origem  = lastRow.querySelector(".trecho-origem").value.toUpperCase();
     const destino = lastRow.querySelector(".trecho-destino").value.toUpperCase();
 
     const res = document.getElementById("resultado");
     if (!origem || !destino) {
-      res.innerHTML = "Para gerar ida e volta, preencha <strong>origem</strong> e <strong>destino</strong> do último trecho.";
+      res.innerHTML =
+        "Para gerar ida e volta, preencha <strong>origem</strong> e <strong>destino</strong> do último trecho.";
       return;
     }
 
     criarTrechoRow(destino, origem);
   });
 });
+
 
 /* ============================================================
    BOTÃO CALCULAR
