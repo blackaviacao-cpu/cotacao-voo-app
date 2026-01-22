@@ -39198,6 +39198,12 @@
     "nome": "Ingeniero Ambrosio Taravella Airport"
   },
   {
+    "icao": "SADF",
+    "lat": -34.723333,
+    "lon": -58.596944,
+    "nome": "Aeroclub Argentino (San Justo)"
+  }
+  {
     "icao": "SADL",
     "lat": -34.9722,
     "lon": -57.8947,
