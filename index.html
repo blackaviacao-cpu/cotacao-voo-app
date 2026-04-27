@@ -592,7 +592,13 @@ if (precoPorKm != null || valorTotal != null) {
       <!-- 🔥 LUCRO -->
       <div class="mt-2 border-t border-slate-700 pt-2"></div>
 
-      <div>Lucro da missão: <strong>${formatarMoedaBr((valorTotal || 0) - totalCusto)}</strong></div>
+      const lucro = (valorTotal || 0) - totalCusto;
+
+const margem = valorTotal > 0
+  ? (lucro / valorTotal) * 100
+  : 0;
+
+const corMargem = margem >= 0 ? "#22c55e" : "#ef4444"; // verde / vermelho
 
     </div>
   `;
