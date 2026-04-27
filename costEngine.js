@@ -221,3 +221,44 @@ function analisarMissao({ trechos, precoKmUsuario }, baseRaw) {
     margemReal
   };
 }
+
+function auditarCustoTrecho(baseRaw, origem, destino) {
+  const linhas = baseRaw.filter(r =>
+    r.origem === origem && r.destino === destino
+  );
+
+  console.group(`AUDITORIA ${origem} → ${destino}`);
+
+  let totalKm = 0;
+  let totalEstrutural = 0;
+  let totalComb = 0;
+
+  const precoLitro = calcularPrecoLitro(linhas, baseRaw);
+
+  linhas.forEach((r, i) => {
+    const km = num(r["dist_km"]);
+    const estrutural = custoOperacionalVoo(r);
+
+    const litros = lbsParaLitros(r["consm.lbs"]);
+    const comb = litros * precoLitro;
+
+    totalKm += km;
+    totalEstrutural += estrutural;
+    totalComb += comb;
+
+    console.log(`Linha ${i + 1}`, {
+      km,
+      estrutural,
+      litros,
+      comb
+    });
+  });
+
+  console.log("----------");
+  console.log("TOTAL KM:", totalKm);
+  console.log("TOTAL ESTRUTURAL:", totalEstrutural);
+  console.log("TOTAL COMBUSTÍVEL:", totalComb);
+  console.log("CUSTO R$/KM FINAL:", (totalEstrutural + totalComb) / totalKm);
+
+  console.groupEnd();
+}
