@@ -478,8 +478,8 @@ resultados.forEach((r, idx) => {
   // 🔥 DADOS DO ENGINE
   const a = analise.trechos[idx];
 
-  const custoKm = a?.custo || 0;
-  const custo = custoKm * r.kmFinal;
+  const custoKm = Number(a?.custoKm) || 0;
+  const custo = Number(a?.custo) || 0;
   const precoSug = analise.precoIdeal * (r.kmFinal / analise.totalKm);
   const precoUser = precoPorKm ? precoPorKm * r.kmFinal : 0;
 
@@ -554,8 +554,7 @@ let totalCusto = 0;
 resultados.forEach((r, idx) => {
   const a = analise.trechos[idx];
 
-  const custoKm = Number(a?.custo) || 0;
-  const custoTrecho = custoKm * r.kmFinal;
+  const custoTrecho = Number(a?.custo) || 0;
 
   totalCusto += custoTrecho;
 });
