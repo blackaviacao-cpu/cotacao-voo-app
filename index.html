@@ -11,7 +11,7 @@
 
   <script src="costEngine.js"></script>
 
-  <script>
+  <script>A
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("service-worker.js");
     }
@@ -566,6 +566,14 @@ resultados.forEach((r, idx) => {
 const custoHora = totalTempoHoras > 0
   ? totalCusto / totalTempoHoras
   : 0;
+
+  const lucro = (valorTotal || 0) - totalCusto;
+
+const margem = valorTotal > 0
+  ? (lucro / valorTotal) * 100
+  : 0;
+
+const corMargem = margem >= 0 ? "#22c55e" : "#ef4444";
   
   let htmlPreco = "";
 if (precoPorKm != null || valorTotal != null) {
@@ -590,17 +598,16 @@ if (precoPorKm != null || valorTotal != null) {
       ${valorTotal != null ? `<div>Valor total: <strong>${formatarMoedaBr(valorTotal)}</strong></div>` : ""}
 
       <!-- 🔥 LUCRO -->
-      <div class="mt-2 border-t border-slate-700 pt-2"></div>
+<div class="mt-2 border-t border-slate-700 pt-2"></div>
 
-      const lucro = (valorTotal || 0) - totalCusto;
+<div>Lucro da missão: <strong>${formatarMoedaBr(lucro)}</strong></div>
 
-const margem = valorTotal > 0
-  ? (lucro / valorTotal) * 100
-  : 0;
-
-const corMargem = margem >= 0 ? "#22c55e" : "#ef4444"; // verde / vermelho
-
-    </div>
+<div>
+  Margem da missão:
+  <strong style="color:${corMargem}">
+    ${margem.toFixed(1)}%
+  </strong>
+</div>
   `;
 }
 
