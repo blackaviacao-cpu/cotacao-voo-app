@@ -101,8 +101,15 @@ function prepararBase(base) {
   return base.map(row => {
 
     const precoLitro = calcularPrecoLitro(row, precoMedio);
-    const custo = custoTotalVoo(row, precoLitro);
     const km = num(row["dist_km"]);
+    const custoBase = custoTotalVoo(row, precoLitro);
+
+    // 🔥 NOVO — CUSTO MANUTENÇÃO
+    const velocidade = 645; // pode deixar fixo por enquanto
+    const custoManutencaoKm = 4000 / velocidade;
+
+    // 🔥 custo total ajustado
+    const custo = custoBase + (km * custoManutencaoKm);
 
     return {
       origem: row.origem,
