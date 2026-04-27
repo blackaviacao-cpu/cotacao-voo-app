@@ -11,8 +11,18 @@ const MIN_VOOS_SIMILARES = 3;
 // UTIL
 // ==========================
 function num(v) {
-  if (v === null || v === undefined || v === "") return 0;
-  return parseFloat(String(v).replace(/\./g, "").replace(",", "."));
+  if (!v) return 0;
+
+  const limpo = String(v)
+    .replace(/\r/g, "")
+    .replace(/\n/g, "")
+    .trim()
+    .replace(/\./g, "")
+    .replace(",", ".");
+
+  const n = parseFloat(limpo);
+
+  return isNaN(n) ? 0 : n;
 }
 
 // ==========================
