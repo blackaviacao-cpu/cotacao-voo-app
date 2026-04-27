@@ -483,9 +483,9 @@ resultados.forEach((r, idx) => {
   const precoSug = analise.precoIdeal * (r.kmFinal / analise.totalKm);
   const precoUser = precoPorKm ? precoPorKm * r.kmFinal : 0;
 
-  const margem = precoUser > 0
-    ? (precoUser - custo) / precoUser
-    : 0;
+  const margemTrecho = precoUser > 0
+  ? (precoUser - custo) / precoUser
+  : 0;
 
   // 🔹 STATUS ORIGINAL
   const status = r.flagReal
@@ -527,7 +527,7 @@ resultados.forEach((r, idx) => {
           <strong class="${
             margem >= 0.55 ? "text-emerald-400" : "text-red-400"
           }">
-            ${(margem * 100).toFixed(1)}%
+            ${(margemTrecho * 100).toFixed(1)}%
           </strong>
         </div>
 
@@ -588,7 +588,7 @@ if (precoPorKm != null || valorTotal != null) {
 
       <div>Custo R$/KM (real): <strong>${formatarRsPorKm(custoKmPonderado)}</strong></div>
 
-      <div>Custo R$/hora (real): <strong>${formatarMoedaBr(custoHora)}</strong></div>
+      <div>Custo R$/hora: <strong>${formatarMoedaBr(custoHora)}</strong></div>
 
       <div class="mt-2 border-t border-slate-700 pt-2"></div>
 
