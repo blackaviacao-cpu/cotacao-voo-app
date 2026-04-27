@@ -471,7 +471,8 @@ const trechosEngine = resultados.map(r => ({
   // 🔥 DADOS DO ENGINE
   const a = analise.trechos[idx];
 
-  const custo = a?.custo || 0;
+  const custoKm = a?.custo || 0;
+  const custo = custoKm * r.kmFinal;
   const precoSug = analise.precoIdeal * (r.kmFinal / analise.totalKm);
   const precoUser = precoPorKm ? precoPorKm * r.kmFinal : 0;
 
@@ -540,9 +541,25 @@ const trechosEngine = resultados.map(r => ({
     </div>
   `;
 
-  const totalCusto = analise.totalCusto;
-  const custoKmPonderado = totalKm > 0 ? totalCusto / totalKm : 0;
-  const custoHora = totalTempoHoras > 0 ? totalCusto / totalTempoHoras : 0;
+  // 🔥 CÁLCULO CORRETO DO CUSTO TOTAL (R$)
+let totalCusto = 0;
+
+resultados.forEach((r, idx) => {
+  const a = analise.trechos[idx];
+
+  const custoKm = Number(a?.custo) || 0;
+  const custoTrecho = custoKm * r.kmFinal;
+
+  totalCusto += custoTrecho;
+});
+
+ const custoKmPonderado = totalKm > 0
+  ? totalCusto / totalKm
+  : 0;
+
+const custoHora = totalTempoHoras > 0
+  ? totalCusto / totalTempoHoras
+  : 0;
   
   let htmlPreco = "";
 if (precoPorKm != null || valorTotal != null) {
