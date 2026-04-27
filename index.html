@@ -573,6 +573,17 @@ const margem = valorTotal > 0
   ? (lucro / valorTotal) * 100
   : 0;
 
+  let receitaHistoricaTotal = 0;
+
+resultados.forEach((r) => {
+  receitaHistoricaTotal += calcularReceitaMedia(
+    BASE_REAL,
+    r.origem,
+    r.destino,
+    r.kmFinal
+  );
+});
+
 const corMargem = margem >= 0 ? "#22c55e" : "#ef4444";
   
   let htmlPreco = "";
