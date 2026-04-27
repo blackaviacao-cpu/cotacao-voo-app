@@ -88,6 +88,7 @@ function custoTotalVoo(row, precoLitro) {
     num(row["transporte"]) +
     num(row["comissoes"]) +
     num(row["com.terceiros"])
+    num(row["mntc.hr"])
   );
 }
 
