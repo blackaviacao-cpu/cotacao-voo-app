@@ -1,71 +1,35 @@
 // ==========================
 // COST ENGINE — BLACK
+// Regra atual:
+// custo operacional da rota = soma dos custos / soma dos km
+// combustível fica fora por enquanto
 // ==========================
 
-const FATOR_LBS_LITROS = 0.567;
 const MARGEM_ALVO = 0.55;
-const SIMILARIDADE_DIST = 0.2; // ±20%
+const SIMILARIDADE_DIST = 0.2;
 const MIN_VOOS_SIMILARES = 3;
 
 // ==========================
 // UTIL
 // ==========================
 function num(v) {
-  if (!v) return 0;
+  if (v === null || v === undefined || v === "") return 0;
 
-  const limpo = String(v)
-    .replace(/\r/g, "")
-    .replace(/\n/g, "")
-    .trim()
-    .replace(/\./g, "")
-    .replace(",", ".");
-
-  const n = parseFloat(limpo);
-
-  return isNaN(n) ? 0 : n;
-}
-
-// ==========================
-// CAMADA 1 — COMBUSTÍVEL
-// ==========================
-function lbsToLitros(lbs) {
-  return num(lbs) * FATOR_LBS_LITROS;
-}
-
-function calcularPrecoLitro(row, precoMedioGlobal) {
-  const litros = num(row["abast.lt."]);
-  const valor = num(row["abast."]);
-
-  if (litros > 0 && valor > 0) {
-    return valor / litros;
+  if (typeof v === "number") {
+    return isNaN(v) ? 0 : v;
   }
 
-  return precoMedioGlobal;
-}
+  let s = String(v)
+    .replace(/\r/g, "")
+    .replace(/\n/g, "")
+    .trim();
 
-function calcularPrecoMedioGlobal(base) {
-  const ultimos = base.slice(-90);
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  }
 
-  let totalValor = 0;
-  let totalLitros = 0;
-
-  ultimos.forEach(r => {
-    const litros = num(r["abast.lt."]);
-    const valor = num(r["abast."]);
-
-    if (litros > 0 && valor > 0) {
-      totalValor += valor;
-      totalLitros += litros;
-    }
-  });
-
-  if (totalLitros === 0) return 0;
-  return totalValor / totalLitros;
-}
-
-function custoCombustivel(row, precoLitro) {
-  const litrosConsumidos = lbsToLitros(row["consm.lbs"]);
-  return litrosConsumidos * precoLitro;
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
 }
 
 function valorCampo(row, nomes) {
@@ -75,155 +39,54 @@ function valorCampo(row, nomes) {
   return 0;
 }
 
-function auditarLinhaCusto(row, precoMedioGlobal) {
-  const precoLitro = calcularPrecoLitro(row, precoMedioGlobal);
-  const litrosConsumidos = lbsToLitros(row["consm.lbs"]);
-  const combustivel = custoCombustivel(row, precoLitro);
-
-  const item = {
-    origem: row.origem,
-    destino: row.destino,
-    km: num(row["dist_km"]),
-    tempo: num(row["tempo"]),
-
-    litrosConsumidos,
-    precoLitro,
-    combustivel,
-
-    decea: num(row["decea"]),
-    taxaAeroportuaria: num(row["tx.aerop."]),
-    comissaria: num(row["comissaria"]),
-    fbo: num(row["fbo"]),
-    slot: num(row["slot"]),
-    outros: num(row["outros"]),
-    variavelTrip: valorCampo(row, ["variavel trip.", "variável trip."]),
-    hospedagem: num(row["hospedagem"]),
-    transporte: num(row["transporte"]),
-    comissoes: num(row["comissoes"]),
-    comTerceiros: num(row["com.terceiros"]),
-    manutencao: num(row["mntc.hr"])
-  };
-
-  item.total =
-    item.combustivel +
-    item.decea +
-    item.taxaAeroportuaria +
-    item.comissaria +
-    item.fbo +
-    item.slot +
-    item.outros +
-    item.variavelTrip +
-    item.hospedagem +
-    item.transporte +
-    item.comissoes +
-    item.comTerceiros +
-    item.manutencao;
-
-  item.custoKm = item.km > 0 ? item.total / item.km : 0;
-
-  return item;
-}
-
-function auditarCustoTrecho(baseRaw, origem, destino, kmRef) {
-  const precoMedioGlobal = calcularPrecoMedioGlobal(baseRaw);
-
-  let linhas = baseRaw.filter(r =>
-    r.origem === origem && r.destino === destino
-  );
-
-  let criterio = "ROTA EXATA";
-
-  if (!linhas.length) {
-    const min = kmRef * (1 - SIMILARIDADE_DIST);
-    const max = kmRef * (1 + SIMILARIDADE_DIST);
-
-    linhas = baseRaw.filter(r =>
-      num(r["dist_km"]) >= min && num(r["dist_km"]) <= max
-    );
-
-    criterio = "DISTÂNCIA SIMILAR";
-  }
-
-  const auditoria = linhas.map(r => auditarLinhaCusto(r, precoMedioGlobal));
-
-  const totalCusto = auditoria.reduce((s, r) => s + r.total, 0);
-  const totalKm = auditoria.reduce((s, r) => s + r.km, 0);
-  const custoKmPonderado = totalKm > 0 ? totalCusto / totalKm : 0;
-
-  console.group(`AUDITORIA ${origem} → ${destino} | ${criterio}`);
-  console.table(auditoria);
-  console.log("TOTAL CUSTO HISTÓRICO:", totalCusto);
-  console.log("TOTAL KM HISTÓRICO:", totalKm);
-  console.log("CUSTO R$/KM PONDERADO:", custoKmPonderado);
-  console.log("KM DO TRECHO COTADO:", kmRef);
-  console.log("CUSTO ESTIMADO DO TRECHO:", custoKmPonderado * kmRef);
-  console.groupEnd();
-
-  return {
-    criterio,
-    auditoria,
-    totalCusto,
-    totalKm,
-    custoKmPonderado,
-    custoEstimadoTrecho: custoKmPonderado * kmRef
-  };
-}
-
 // ==========================
-// CAMADA 2 — CUSTO ALL-IN
+// CUSTO OPERACIONAL — SEM COMBUSTÍVEL
 // ==========================
-function custoTotalVoo(row, precoLitro) {
-
-  const combustivel = custoCombustivel(row, precoLitro);
-
+function custoOperacionalVoo(row) {
   return (
-    combustivel +
     num(row["decea"]) +
     num(row["tx.aerop."]) +
     num(row["comissaria"]) +
     num(row["fbo"]) +
-    num(row["slot"]) +
-    num(row["outros"]) +
-    valorCampo(row, ["variavel trip.", "variável trip."]) +
     num(row["hospedagem"]) +
     num(row["transporte"]) +
+    num(row["slot"]) +
+    num(row["outros"]) +
     num(row["comissoes"]) +
+    valorCampo(row, ["variavel trip.", "variável trip."]) +
     num(row["com.terceiros"]) +
     num(row["mntc.hr"])
   );
 }
 
 // ==========================
-// CAMADA 3 — PREPARAR BASE
+// PREPARAR BASE
 // ==========================
 function prepararBase(base) {
-
-  const precoMedio = calcularPrecoMedioGlobal(base);
-
   return base.map(row => {
-
-    const precoLitro = calcularPrecoLitro(row, precoMedio);
-    const custo = custoTotalVoo(row, precoLitro);
     const km = num(row["dist_km"]);
+    const custo = custoOperacionalVoo(row);
 
     return {
       origem: row.origem,
       destino: row.destino,
       km,
-      custo,
-      custoKm: km > 0 ? custo / km : 0
+      custo
     };
-  });
+  }).filter(v =>
+    v.origem &&
+    v.destino &&
+    v.km > 0
+  );
 }
 
 // ==========================
-// CAMADA 4 — AGRUPAR ROTAS
+// AGRUPAR ROTAS
 // ==========================
-function agruparRotas(base) {
-
+function agruparRotas(basePreparada) {
   const rotas = {};
 
-  base.forEach(v => {
+  basePreparada.forEach(v => {
     const key = `${v.origem}_${v.destino}`;
     if (!rotas[key]) rotas[key] = [];
     rotas[key].push(v);
@@ -233,69 +96,75 @@ function agruparRotas(base) {
 }
 
 // ==========================
-// CAMADA 5 — CUSTO POR KM ROTA
+// CUSTO R$/KM = SOMA CUSTOS / SOMA KM
 // ==========================
-function custoKmRota(voos) {
-
-  let totalCusto = 0;
-  let totalKm = 0;
-
-  voos.forEach(v => {
-    totalCusto += v.custo;
-    totalKm += v.km;
-  });
+function custoKmPorAmostra(voos) {
+  const totalCusto = voos.reduce((s, v) => s + v.custo, 0);
+  const totalKm = voos.reduce((s, v) => s + v.km, 0);
 
   return totalKm > 0 ? totalCusto / totalKm : 0;
 }
 
 // ==========================
-// CAMADA 6 — FALLBACK DISTÂNCIA
+// BUSCAR CUSTO R$/KM DA ROTA
 // ==========================
-function custoKmSimilar(base, kmRef) {
+function obterCustoKm(basePreparada, rotas, origem, destino, kmRef) {
+  const key = `${origem}_${destino}`;
 
+  // 1) rota exata
+  if (rotas[key] && rotas[key].length) {
+    return custoKmPorAmostra(rotas[key]);
+  }
+
+  // 2) fallback por distância similar
   const min = kmRef * (1 - SIMILARIDADE_DIST);
   const max = kmRef * (1 + SIMILARIDADE_DIST);
 
-  const similares = base.filter(v =>
+  const similares = basePreparada.filter(v =>
     v.km >= min && v.km <= max
   );
 
   if (similares.length >= MIN_VOOS_SIMILARES) {
-    return custoKmRota(similares);
+    return custoKmPorAmostra(similares);
   }
 
-  return null;
+  // 3) fallback global
+  return custoKmPorAmostra(basePreparada);
 }
 
 // ==========================
-// CAMADA 7 — GLOBAL
+// AUDITORIA
 // ==========================
-function custoKmGlobal(base) {
-  return custoKmRota(base);
+function auditarCustoTrecho(baseRaw, origem, destino, kmRef) {
+  const basePreparada = prepararBase(baseRaw);
+  const linhas = basePreparada.filter(v =>
+    v.origem === origem && v.destino === destino
+  );
+
+  const totalCusto = linhas.reduce((s, v) => s + v.custo, 0);
+  const totalKm = linhas.reduce((s, v) => s + v.km, 0);
+  const custoKm = totalKm > 0 ? totalCusto / totalKm : 0;
+  const custoTrecho = custoKm * kmRef;
+
+  console.group(`AUDITORIA ${origem} → ${destino}`);
+  console.table(linhas);
+  console.log("TOTAL CUSTO:", totalCusto);
+  console.log("TOTAL KM:", totalKm);
+  console.log("CUSTO R$/KM:", custoKm);
+  console.log("KM COTADO:", kmRef);
+  console.log("CUSTO ESTIMADO DO TRECHO:", custoTrecho);
+  console.groupEnd();
+
+  return {
+    totalCusto,
+    totalKm,
+    custoKm,
+    custoTrecho
+  };
 }
 
 // ==========================
-// CAMADA 8 — OBTER CUSTO TRECHO
-// ==========================
-function obterCustoKm(basePreparada, rotas, origem, destino, km) {
-
-  const key = `${origem}_${destino}`;
-
-  // 1️⃣ Rota exata
-  if (rotas[key]) {
-    return custoKmRota(rotas[key]);
-  }
-
-  // 2️⃣ Similar por distância
-  const similar = custoKmSimilar(basePreparada, km);
-  if (similar) return similar;
-
-  // 3️⃣ Global
-  return custoKmGlobal(basePreparada);
-}
-
-// ==========================
-// CAMADA 9 — PRECIFICAÇÃO
+// PRECIFICAÇÃO
 // ==========================
 function precoSugerido(custo) {
   return custo / (1 - MARGEM_ALVO);
@@ -307,10 +176,9 @@ function margem(preco, custo) {
 }
 
 // ==========================
-// CAMADA 10 — ENGINE PRINCIPAL
+// ENGINE PRINCIPAL
 // ==========================
 function analisarMissao({ trechos, precoKmUsuario }, baseRaw) {
-
   const basePreparada = prepararBase(baseRaw);
   const rotas = agruparRotas(basePreparada);
 
@@ -318,7 +186,6 @@ function analisarMissao({ trechos, precoKmUsuario }, baseRaw) {
   let totalCusto = 0;
 
   const resultadoTrechos = trechos.map(t => {
-
     const custoKm = obterCustoKm(
       basePreparada,
       rotas,
@@ -347,6 +214,7 @@ function analisarMissao({ trechos, precoKmUsuario }, baseRaw) {
     trechos: resultadoTrechos,
     totalKm,
     totalCusto,
+    custoKmMedio: totalKm > 0 ? totalCusto / totalKm : 0,
     precoUsuario,
     precoIdeal,
     margemReal
