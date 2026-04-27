@@ -9,6 +9,8 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0f172a">
 
+  <script src="costEngine.js"></script>
+
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("service-worker.js");
@@ -262,20 +264,22 @@ function carregarBaseReal() {
       const idxTempo   = headers.indexOf("tempo");
 
       BASE_REAL = linhas.map(linha => {
-        const cols = linha.split(sep);
-        return {
-          origem:  (cols[idxOrigem]  || "").trim().toUpperCase(),
-          destino: (cols[idxDestino] || "").trim().toUpperCase(),
-          dist_km: parseNumeroBr(cols[idxDistKm]),
-          tempo:   parseNumeroBr(cols[idxTempo])
-        };
-      }).filter(r =>
-        r.origem && r.destino &&
-        !isNaN(r.dist_km) &&
-        !isNaN(r.tempo) &&
-        r.dist_km > 0 &&
-        r.tempo > 0
-      );
+  const cols = linha.split(sep);
+
+  const obj = {};
+  headers.forEach((h, i) => {
+    obj[h] = cols[i];
+  });
+
+  obj.dist_km = parseNumeroBr(obj.dist_km);
+obj.tempo   = parseNumeroBr(obj.tempo);      
+
+  return obj;
+}).filter(r =>
+  r.origem && r.destino &&
+  !isNaN(parseNumeroBr(r.dist_km)) &&
+  !isNaN(parseNumeroBr(r.tempo))
+);
 
       console.log("Rotas REAIS carregadas:", BASE_REAL.length);
 
@@ -370,68 +374,75 @@ document.getElementById("btnCalcular").addEventListener("click", () => {
   let totalKm = 0;
   let totalTempoHoras = 0;
 
-  for (const t of trechos) {
-    const apOrigem  = getAirport(t.origem);
-    const apDestino = getAirport(t.destino);
+ for (const t of trechos) {
+  const apOrigem  = getAirport(t.origem);
+  const apDestino = getAirport(t.destino);
 
-    if (!apOrigem || !apDestino) {
-      res.innerHTML = `Não encontrei o aeródromo <strong>${t.origem}</strong> ou <strong>${t.destino}</strong> na base.`;
-      return;
-    }
-
-    const kmTeorico = Math.round(
-      haversineKm(apOrigem.lat, apOrigem.lon, apDestino.lat, apDestino.lon)
-    );
-
-    // Rotas reais para essa origem/destino
-    const rotas = BASE_REAL.filter(r => r.origem === t.origem && r.destino === t.destino);
-
-    let kmFinal = kmTeorico;
-    let tempoHoras = null;
-    let flagReal = false;
-
-    // 1) Se há rotas reais, usa média real daquela rota
-    if (rotas.length > 0) {
-      const somaDist = rotas.reduce((s, r) => s + r.dist_km, 0);
-      const somaTempo = rotas.reduce((s, r) => s + r.tempo, 0);
-
-      if (somaDist > 0 && somaTempo > 0) {
-        kmFinal = Math.round(somaDist / rotas.length);
-        const velocidadeMedia = somaDist / somaTempo; // km/h
-        tempoHoras = kmFinal / velocidadeMedia;
-        flagReal = true;
-      }
-    }
-
-// 2) Se NÃO há rotas reais → aplicar fator 1.10 na distância + usar velocidade média global
-if (!flagReal) {
-
-  // aplica fator 10% na distância teórica
-  kmFinal = Math.round(kmTeorico * 1.10);
-
-  // se existir velocidade global, calcula o tempo corrigido
-  if (VELOCIDADE_MEDIA_GLOBAL && VELOCIDADE_MEDIA_GLOBAL > 0) {
-    tempoHoras = kmFinal / VELOCIDADE_MEDIA_GLOBAL;
+  if (!apOrigem || !apDestino) {
+    res.innerHTML = `Não encontrei o aeródromo <strong>${t.origem}</strong> ou <strong>${t.destino}</strong> na base.`;
+    return;
   }
+
+  const kmTeorico = Math.round(
+    haversineKm(apOrigem.lat, apOrigem.lon, apDestino.lat, apDestino.lon)
+  );
+
+  // Rotas reais para essa origem/destino
+  const rotas = BASE_REAL.filter(r =>
+    r.origem === t.origem && r.destino === t.destino
+  );
+
+  let kmFinal = kmTeorico;
+  let tempoHoras = null;
+  let flagReal = false;
+
+  // 1) Se há rotas reais, usa média real daquela rota
+  if (rotas.length > 0) {
+    const somaDist = rotas.reduce((s, r) => s + r.dist_km, 0);
+    const somaTempo = rotas.reduce((s, r) => s + r.tempo, 0);
+
+    if (somaDist > 0 && somaTempo > 0) {
+      kmFinal = Math.round(somaDist / rotas.length);
+      const velocidadeMedia = somaDist / somaTempo; // km/h
+      tempoHoras = kmFinal / velocidadeMedia;
+      flagReal = true;
+    }
+  }
+
+  // 2) Se NÃO há rotas reais → fallback
+  if (!flagReal) {
+
+    kmFinal = Math.round(kmTeorico * 1.10);
+
+    if (VELOCIDADE_MEDIA_GLOBAL && VELOCIDADE_MEDIA_GLOBAL > 0) {
+      tempoHoras = kmFinal / VELOCIDADE_MEDIA_GLOBAL;
+    }
+  }
+
+  totalKm += kmFinal;
+
+  if (tempoHoras != null && !isNaN(tempoHoras)) {
+    totalTempoHoras += tempoHoras;
+  }
+
+  resultados.push({
+    origem: t.origem,
+    destino: t.destino,
+    apOrigem,
+    apDestino,
+    kmTeorico,
+    kmFinal,
+    tempoHoras,
+    flagReal
+  });
 }
 
-
-    totalKm += kmFinal;
-    if (tempoHoras != null && !isNaN(tempoHoras)) {
-      totalTempoHoras += tempoHoras;
-    }
-
-    resultados.push({
-      origem: t.origem,
-      destino: t.destino,
-      apOrigem,
-      apDestino,
-      kmTeorico,
-      kmFinal,
-      tempoHoras,
-      flagReal
-    });
-  }
+// ✅ PASSO 3 — AGORA NO LUGAR CERTO
+const trechosEngine = resultados.map(r => ({
+  origem: r.origem,
+  destino: r.destino,
+  km: r.kmFinal
+}));
 
   // PREÇO
   let precoPorKm = null;
@@ -448,30 +459,75 @@ if (!flagReal) {
     }
   }
 
+  const analise = analisarMissao({
+  trechos: trechosEngine,
+  precoKmUsuario: precoPorKm || 0
+}, BASE_REAL);
+
   // HTML de cada trecho
   let htmlTrechos = "";
-  resultados.forEach((r, idx) => {
-    const status = r.flagReal
-      ? `<span class="text-emerald-400 font-semibold">REAL</span>`
-      : `<span class="text-amber-300 font-semibold">TEÓRICA</span>`;
+ resultados.forEach((r, idx) => {
 
-    const tempoFmt = r.tempoHoras != null
-      ? formatarTempoHorasDec(r.tempoHoras)
-      : null;
+  // 🔥 DADOS DO ENGINE
+  const a = analise.trechos[idx];
 
-    htmlTrechos += `
-      <div class="mb-2 border-b border-slate-700 pb-2">
-        <div class="text-xs text-slate-500 mb-1">Trecho ${idx + 1}</div>
-        <div>
-          <strong>${r.apOrigem.icao}</strong> (${r.apOrigem.nome}) →
-          <strong>${r.apDestino.icao}</strong> (${r.apDestino.nome})
-        </div>
-        <div>Status: ${status}</div>
-        <div>Distância utilizada: <strong>${r.kmFinal.toLocaleString("pt-BR")} km</strong></div>
-        ${tempoFmt ? `<div>Tempo estimado: <strong>${tempoFmt}</strong></div>` : ""}
+  const custo = a?.custo || 0;
+  const precoSug = analise.precoIdeal * (r.kmFinal / analise.totalKm);
+  const precoUser = precoPorKm ? precoPorKm * r.kmFinal : 0;
+
+  const margem = precoUser > 0
+    ? (precoUser - custo) / precoUser
+    : 0;
+
+  // 🔹 STATUS ORIGINAL
+  const status = r.flagReal
+    ? `<span class="text-emerald-400 font-semibold">REAL</span>`
+    : `<span class="text-amber-300 font-semibold">TEÓRICA</span>`;
+
+  const tempoFmt = r.tempoHoras != null
+    ? formatarTempoHorasDec(r.tempoHoras)
+    : null;
+
+  // 🔥 HTML COMPLETO
+  htmlTrechos += `
+    <div class="mb-3 border-b border-slate-700 pb-3">
+
+      <div class="text-xs text-slate-500 mb-1">Trecho ${idx + 1}</div>
+
+      <div>
+        <strong>${r.apOrigem.icao}</strong> (${r.apOrigem.nome}) →
+        <strong>${r.apDestino.icao}</strong> (${r.apDestino.nome})
       </div>
-    `;
-  });
+
+      <div>Status: ${status}</div>
+
+      <div>Distância utilizada: <strong>${r.kmFinal.toLocaleString("pt-BR")} km</strong></div>
+
+      ${tempoFmt ? `<div>Tempo estimado: <strong>${tempoFmt}</strong></div>` : ""}
+
+      <!-- 🔥 BLOCO NOVO -->
+      <div class="mt-2 text-xs text-slate-400">
+
+        <div>Custo estimado: <strong>${formatarMoedaBr(custo)}</strong></div>
+
+        <div>Preço sugerido (55%): <strong>${formatarMoedaBr(precoSug)}</strong></div>
+
+        <div>Preço atual: <strong>${formatarMoedaBr(precoUser)}</strong></div>
+
+        <div>
+          Margem: 
+          <strong class="${
+            margem >= 0.55 ? "text-emerald-400" : "text-red-400"
+          }">
+            ${(margem * 100).toFixed(1)}%
+          </strong>
+        </div>
+
+      </div>
+
+    </div>
+  `;
+});
 
   const tempoTotalFmt = totalTempoHoras > 0
     ? formatarTempoHorasDec(totalTempoHoras)
