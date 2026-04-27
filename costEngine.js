@@ -73,7 +73,7 @@ function custoTotalVoo(row, precoLitro) {
     num(row["fbo"]) +
     num(row["slot"]) +
     num(row["outros"]) +
-    num(row["variável trip."]) +
+    num(row["variavel trip."]) +
     num(row["hospedagem"]) +
     num(row["transporte"]) +
     num(row["comissoes"]) +
