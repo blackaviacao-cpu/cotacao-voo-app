@@ -222,6 +222,49 @@ function analisarMissao({ trechos, precoKmUsuario }, baseRaw) {
   };
 }
 
+function calcularReceitaMedia(BASE_REAL, origem, destino, kmMissao) {
+
+  const margemKm = kmMissao * 0.20; // tolerância 20%
+
+  // 🔹 1. FILTRA RECEITAS VÁLIDAS
+  const validos = BASE_REAL.filter(r =>
+    Number(r.receita) > 1
+  );
+
+  if (!validos.length) return 0;
+
+  // 🔹 2. TENTA MESMA ROTA
+  let candidatos = validos.filter(r =>
+    r.origem === origem && r.destino === destino
+  );
+
+  // 🔹 3. SE NÃO TIVER SUFICIENTE, USA KM SIMILAR
+  if (candidatos.length < 5) {
+    candidatos = validos.filter(r =>
+      Math.abs(Number(r.dist_km) - kmMissao) <= margemKm
+    );
+  }
+
+  if (!candidatos.length) return 0;
+
+  // 🔹 4. MÉDIA PONDERADA POR KM
+  let somaReceita = 0;
+  let somaKm = 0;
+
+  candidatos.forEach(r => {
+    const km = Number(r.dist_km);
+    const receita = Number(r.receita);
+
+    somaReceita += receita;
+    somaKm += km;
+  });
+
+  const receitaPorKm = somaKm > 0 ? somaReceita / somaKm : 0;
+
+  return receitaPorKm * kmMissao;
+}
+
+
 function auditarCustoTrecho(baseRaw, origem, destino) {
   const linhas = baseRaw.filter(r =>
     r.origem === origem && r.destino === destino
