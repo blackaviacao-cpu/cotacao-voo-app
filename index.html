@@ -540,16 +540,40 @@ const trechosEngine = resultados.map(r => ({
     </div>
   `;
 
+  const totalCusto = analise.totalCusto;
+  const custoKmPonderado = totalKm > 0 ? totalCusto / totalKm : 0;
+  const custoHora = totalTempoHoras > 0 ? totalCusto / totalTempoHoras : 0;
+  
   let htmlPreco = "";
-  if (precoPorKm != null || valorTotal != null) {
-    htmlPreco = `
-      <div class="mt-3 border-t border-slate-700 pt-2">
-        <div class="text-sm font-medium text-slate-200 mb-1">Resumo financeiro</div>
-        ${precoPorKm != null ? `<div>R$/KM efetivo: <strong>${formatarRsPorKm(precoPorKm)}</strong></div>` : ""}
-        ${valorTotal != null ? `<div>Valor total: <strong>${formatarMoedaBr(valorTotal)}</strong></div>` : ""}
-      </div>
-    `;
-  }
+if (precoPorKm != null || valorTotal != null) {
+
+  htmlPreco = `
+    <div class="mt-3 border-t border-slate-700 pt-2">
+
+      <div class="text-sm font-medium text-slate-200 mb-2">Resumo financeiro</div>
+
+      <!-- 🔥 CUSTO -->
+      <div>Custo total: <strong>${formatarMoedaBr(totalCusto)}</strong></div>
+
+      <div>Custo R$/KM (real): <strong>${formatarRsPorKm(custoKmPonderado)}</strong></div>
+
+      <div>Custo R$/hora (real): <strong>${formatarMoedaBr(custoHora)}</strong></div>
+
+      <div class="mt-2 border-t border-slate-700 pt-2"></div>
+
+      <!-- 🔥 RECEITA -->
+      ${precoPorKm != null ? `<div>R$/KM efetivo: <strong>${formatarRsPorKm(precoPorKm)}</strong></div>` : ""}
+
+      ${valorTotal != null ? `<div>Valor total: <strong>${formatarMoedaBr(valorTotal)}</strong></div>` : ""}
+
+      <!-- 🔥 LUCRO -->
+      <div class="mt-2 border-t border-slate-700 pt-2"></div>
+
+      <div>Lucro da missão: <strong>${formatarMoedaBr((valorTotal || 0) - totalCusto)}</strong></div>
+
+    </div>
+  `;
+}
 
   res.innerHTML = `
     ${htmlTrechos}
