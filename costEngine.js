@@ -101,28 +101,8 @@ function prepararBase(base) {
   return base.map(row => {
 
     const precoLitro = calcularPrecoLitro(row, precoMedio);
+    const custo = custoTotalVoo(row, precoLitro);
     const km = num(row["dist_km"]);
-const tempo = num(row["tempo"]);
-
-const custoBase = custoTotalVoo(row, precoLitro);
-
-// 🔥 velocidade REAL do voo
-let velocidade = 0;
-
-if (tempo > 0) {
-  velocidade = km / tempo;
-}
-
-// 🔥 fallback (se vier tempo inválido)
-if (!velocidade || velocidade <= 0) {
-  velocidade = 600; // fallback seguro
-}
-
-// 🔥 custo manutenção por km baseado no voo real
-const custoManutencaoKm = 4000 / velocidade;
-
-// 🔥 custo total
-const custo = custoBase + (km * custoManutencaoKm);
 
     return {
       origem: row.origem,
