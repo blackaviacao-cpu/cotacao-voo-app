@@ -464,6 +464,13 @@ const trechosEngine = resultados.map(r => ({
   precoKmUsuario: precoPorKm || 0
 }, BASE_REAL);
 
+  console.clear();
+console.log("===== AUDITORIA DE CUSTOS DA MISSÃO =====");
+
+resultados.forEach((r, idx) => {
+  auditarCustoTrecho(BASE_REAL, r.origem, r.destino, r.kmFinal);
+});
+
   // HTML de cada trecho
   let htmlTrechos = "";
  resultados.forEach((r, idx) => {
