@@ -68,6 +68,107 @@ function custoCombustivel(row, precoLitro) {
   return litrosConsumidos * precoLitro;
 }
 
+function valorCampo(row, nomes) {
+  for (const nome of nomes) {
+    if (row[nome] !== undefined) return num(row[nome]);
+  }
+  return 0;
+}
+
+function auditarLinhaCusto(row, precoMedioGlobal) {
+  const precoLitro = calcularPrecoLitro(row, precoMedioGlobal);
+  const litrosConsumidos = lbsToLitros(row["consm.lbs"]);
+  const combustivel = custoCombustivel(row, precoLitro);
+
+  const item = {
+    origem: row.origem,
+    destino: row.destino,
+    km: num(row["dist_km"]),
+    tempo: num(row["tempo"]),
+
+    litrosConsumidos,
+    precoLitro,
+    combustivel,
+
+    decea: num(row["decea"]),
+    taxaAeroportuaria: num(row["tx.aerop."]),
+    comissaria: num(row["comissaria"]),
+    fbo: num(row["fbo"]),
+    slot: num(row["slot"]),
+    outros: num(row["outros"]),
+    variavelTrip: valorCampo(row, ["variavel trip.", "variável trip."]),
+    hospedagem: num(row["hospedagem"]),
+    transporte: num(row["transporte"]),
+    comissoes: num(row["comissoes"]),
+    comTerceiros: num(row["com.terceiros"]),
+    manutencao: num(row["mntc.hr"])
+  };
+
+  item.total =
+    item.combustivel +
+    item.decea +
+    item.taxaAeroportuaria +
+    item.comissaria +
+    item.fbo +
+    item.slot +
+    item.outros +
+    item.variavelTrip +
+    item.hospedagem +
+    item.transporte +
+    item.comissoes +
+    item.comTerceiros +
+    item.manutencao;
+
+  item.custoKm = item.km > 0 ? item.total / item.km : 0;
+
+  return item;
+}
+
+function auditarCustoTrecho(baseRaw, origem, destino, kmRef) {
+  const precoMedioGlobal = calcularPrecoMedioGlobal(baseRaw);
+
+  let linhas = baseRaw.filter(r =>
+    r.origem === origem && r.destino === destino
+  );
+
+  let criterio = "ROTA EXATA";
+
+  if (!linhas.length) {
+    const min = kmRef * (1 - SIMILARIDADE_DIST);
+    const max = kmRef * (1 + SIMILARIDADE_DIST);
+
+    linhas = baseRaw.filter(r =>
+      num(r["dist_km"]) >= min && num(r["dist_km"]) <= max
+    );
+
+    criterio = "DISTÂNCIA SIMILAR";
+  }
+
+  const auditoria = linhas.map(r => auditarLinhaCusto(r, precoMedioGlobal));
+
+  const totalCusto = auditoria.reduce((s, r) => s + r.total, 0);
+  const totalKm = auditoria.reduce((s, r) => s + r.km, 0);
+  const custoKmPonderado = totalKm > 0 ? totalCusto / totalKm : 0;
+
+  console.group(`AUDITORIA ${origem} → ${destino} | ${criterio}`);
+  console.table(auditoria);
+  console.log("TOTAL CUSTO HISTÓRICO:", totalCusto);
+  console.log("TOTAL KM HISTÓRICO:", totalKm);
+  console.log("CUSTO R$/KM PONDERADO:", custoKmPonderado);
+  console.log("KM DO TRECHO COTADO:", kmRef);
+  console.log("CUSTO ESTIMADO DO TRECHO:", custoKmPonderado * kmRef);
+  console.groupEnd();
+
+  return {
+    criterio,
+    auditoria,
+    totalCusto,
+    totalKm,
+    custoKmPonderado,
+    custoEstimadoTrecho: custoKmPonderado * kmRef
+  };
+}
+
 // ==========================
 // CAMADA 2 — CUSTO ALL-IN
 // ==========================
